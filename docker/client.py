@@ -465,7 +465,7 @@ class Client(requests.Session):
             self._cfg['Configs'][registry] = req_data
         return res
 
-    def logs(self, container):
+    def logs(self, container, split_streams=False):
         if isinstance(container, dict):
             container = container.get('Id')
         params = {
@@ -476,16 +476,21 @@ class Client(requests.Session):
         u = self._url("/containers/{0}/attach".format(container))
         if utils.compare_version('1.6', self._version) < 0:
             return self._result(self._post(u, params=params))
-        res = ''
+        if split_streams:
+            streams = {1: 'stdout', 2: 'stderr'}
+            res = {'stdout': '', 'stderr': ''}
+        else:
+            res = ''
         response = self._result(self._post(u, params=params))
         walker = 0
         while walker < len(response):
             header = response[walker:walker+8]
             walker += 8
-            # we don't care about the type of stream since we want both
-            # stdout and stderr
-            length = struct.unpack(">L", header[4:].encode())[0]
-            res += response[walker:walker+length]
+            stream, length = struct.unpack(">BxxxL", header.encode())
+            if split_streams:
+                res[streams[stream]] += response[walker:walker+length]
+            else:
+                res += response[walker:walker+length]
             walker += length
         return res
 
