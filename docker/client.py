@@ -120,7 +120,6 @@ class Client(requests.Session):
 
     def _result(self, response, json=False, raw=False):
         self._raise_for_status(response)
-
         if json:
             return response.json()
         if raw:
@@ -508,10 +507,19 @@ class Client(requests.Session):
         json_ = res.json()
         s_port = str(private_port)
         f_port = None
-        if s_port in json_['NetworkSettings']['PortMapping']['Udp']:
-            f_port = json_['NetworkSettings']['PortMapping']['Udp'][s_port]
-        elif s_port in json_['NetworkSettings']['PortMapping']['Tcp']:
-            f_port = json_['NetworkSettings']['PortMapping']['Tcp'][s_port]
+
+        if json_['NetworkSettings'].get('PortMapping'):
+            if s_port in json_['NetworkSettings']['PortMapping']['Udp']:
+                f_port = json_['NetworkSettings']['PortMapping']['Udp'][s_port]
+            elif s_port in json_['NetworkSettings']['PortMapping']['Tcp']:
+                f_port = json_['NetworkSettings']['PortMapping']['Tcp'][s_port]
+        elif json_['NetworkSettings'].get('Ports'):
+            to_try = (s_port, s_port + '/tcp', s_port + '/udp')
+            for key in to_try:
+                if key in json_['NetworkSettings']['Ports']:
+                    f_port = json_['NetworkSettings'][
+                        'Ports'][key][0]['HostPort']
+                    break
 
         return f_port
 
