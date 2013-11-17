@@ -32,6 +32,7 @@ DEFAULT_TIMEOUT_SECONDS = 60
 
 
 class APIError(requests.exceptions.HTTPError):
+
     def __init__(self, message, response, explanation=None):
         super(APIError, self).__init__(message, response)
 
@@ -65,6 +66,7 @@ class APIError(requests.exceptions.HTTPError):
 
 
 class Client(requests.Session):
+
     def __init__(self, base_url="unix://var/run/docker.sock", version="1.6",
                  timeout=DEFAULT_TIMEOUT_SECONDS):
         super(Client, self).__init__()
@@ -116,12 +118,15 @@ class Client(requests.Session):
         self._raise_for_status(response)
         return response.raw._fp.fp._sock
 
-    def _result(self, response, json=False):
+    def _result(self, response, json=False, raw=False):
         self._raise_for_status(response)
 
         if json:
             return response.json()
-        return response.text
+        if raw:
+            return response.content
+        else:
+            return response.text
 
     def _container_config(self, image, command, hostname=None, user=None,
                           detach=False, stdin_open=False, tty=False,
@@ -482,16 +487,16 @@ class Client(requests.Session):
             res = {'stdout': '', 'stderr': ''}
         else:
             res = ''
-        response = self._result(self._post(u, params=params))
+        response = self._result(self._post(u, params=params), raw=True)
         walker = 0
         while walker < len(response):
-            header = response[walker:walker+8]
+            header = response[walker:walker + 8]
             walker += 8
-            stream, length = struct.unpack(">BxxxL", header.encode())
+            stream, length = struct.unpack(">BxxxL", header)
             if split_streams:
-                res[streams[stream]] += response[walker:walker+length]
+                res[streams[stream]] += response[walker:walker + length]
             else:
-                res += response[walker:walker+length]
+                res += response[walker:walker + length]
             walker += length
         return res
 
